@@ -1,0 +1,11 @@
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
+deepface>=0.0.79
+pywebview>=4.4.1
+Pillow>=10.0.0
+numpy>=1.24.0
+tensorflow>=2.13.0
+pywin32>=305
+
+
+

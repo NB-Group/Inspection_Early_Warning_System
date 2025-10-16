@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人脸识别预警系统 - 设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* 左侧设置面板 */
+        .settings-panel {
+            width: 400px;
+            background: #0f0f0f;
+            border-right: 1px solid #1a1a1a;
+            overflow-y: auto;
+            padding: 30px;
+        }
+        
+        .settings-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .settings-panel::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        .settings-panel::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+        
+        .settings-panel::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #00d4aa;
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 3px;
+            height: 16px;
+            background: #00d4aa;
+            border-radius: 2px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #b0b0b0;
+        }
+        
+        input[type="number"],
+        input[type="text"],
+        input[type="url"],
+        input[type="range"],
+        select {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #e0e0e0;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #00d4aa;
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+        }
+        
+        input[type="range"] {
+            padding: 0;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        /* URL输入框样式增强 */
+        .url-input {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .url-input input {
+            flex: 1;
+        }
+        .input-help {
+            font-size: 12px;
+            color: #888;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #00d4aa;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #00ecc0;
+            transform: scale(1.1);
+        }
+        
+        .range-value {
+            display: inline-block;
+            margin-left: 10px;
+            color: #00d4aa;
+            font-weight: 600;
+            min-width: 60px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: #00d4aa;
+            color: #000;
+        }
+        
+        .btn-primary:hover {
+            background: #00ecc0;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            border: 1px solid #2a2a2a;
+            margin-top: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: #2a2a2a;
+        }
+        
+        .btn-danger {
+            background: #ff4444;
+            color: #fff;
+            margin-top: 10px;
+        }
+        
+        .btn-danger:hover {
+            background: #ff6666;
+        }
+        
+        /* 右侧预览面板 */
+        .preview-panel {
+            flex: 1;
+            background: #0a0a0a;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .preview-header {
+            margin-bottom: 20px;
+        }
+        
+        .preview-header h2 {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .preview-status {
+            font-size: 14px;
+            color: #888;
+        }
+        
+        .preview-status.active {
+            color: #00d4aa;
+        }
+        
+        .preview-container {
+            flex: 1;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #2a2a2a;
+        }
+        
+        #preview {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .preview-placeholder {
+            text-align: center;
+            color: #666;
+        }
+        
+        .preview-placeholder svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+        
+        /* 人脸列表 */
+        .face-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .face-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .face-list::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        .face-list::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 3px;
+        }
+        
+        .face-list::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+        
+        .face-item {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        
+        .face-item:hover {
+            background: #2a2a2a;
+            border-color: #3a3a3a;
+        }
+        
+        .face-thumbnail {
+            width: 50px;
+            height: 50px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #0a0a0a;
+        }
+        
+        .face-info {
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .face-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .face-remove {
+            background: #ff4444;
+            border: none;
+            color: #fff;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .face-remove:hover {
+            background: #ff6666;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            margin-right: 6px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .status-indicator.active {
+            background: #00d4aa;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn-snapshot {
+            background: #00d4aa;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-snapshot:hover {
+            background: #00ecc0;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+        }
+        
+        .btn-snapshot:active {
+            transform: translateY(0);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 16px 20px;
+            color: #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+            z-index: 10000;
+            max-width: 400px;
+        }
+        
+        .notification.success {
+            border-left: 4px solid #00d4aa;
+        }
+        
+        .notification.error {
+            border-left: 4px solid #ff4444;
+        }
+        
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .notification-message {
+            font-size: 13px;
+            color: #b0b0b0;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* 加载指示器 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+        }
+        
+        .loading-overlay.show {
+            display: flex;
+        }
+        
+        .loading-content {
+            background: #1a1a1a;
+            border: 2px solid #00d4aa;
+            border-radius: 12px;
+            padding: 30px 50px;
+            text-align: center;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #2a2a2a;
+            border-top-color: #00d4aa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .loading-text {
+            color: #e0e0e0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载指示器 -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loading-text">加载中...</div>
+        </div>
+    </div>
+    
+    <div class="titlebar pywebview-drag-region" style="position:fixed;top:0;left:0;right:0;height:46px;background:#0f0f0f;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between;padding:0 12px;z-index:10;user-select:none;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:8px;height:20px;background:#00d4aa;border-radius:2px;"></div>
+            <div style="color:#e0e0e0;font-weight:700;">人脸识别预警系统 - 设置</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="pywebview.api.minimize_window()" style="width:28px;height:28px;border:none;border-radius:4px;background:#1a1a1a;color:#e0e0e0;cursor:pointer;">—</button>
+            <button onclick="pywebview.api.toggle_maximize()" style="width:28px;height:28px;border:none;border-radius:4px;background:#1a1a1a;color:#e0e0e0;cursor:pointer;">▢</button>
+            <button onclick="pywebview.api.close_window()" style="width:28px;height:28px;border:none;border-radius:4px;background:#ff4444;color:#fff;cursor:pointer;">✕</button>
+        </div>
+    </div>
+    <div class="container" style="padding-top:60px;">
+        <!-- 左侧设置面板 -->
+        <div class="settings-panel">
+            <h1>消污除腐</h1>
+            <p class="subtitle">人脸识别预警系统</p>
+            
+            <!-- 摄像头设置 -->
+            <div class="section">
+                <div class="section-title">摄像头设置</div>
+                
+                <div class="form-group">
+                    <label>摄像头类型</label>
+                    <select id="camera-type">
+                        <option value="local">本地摄像头</option>
+                        <option value="ip">IP摄像头（手机/网络）</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="dual-row" style="display:none;">
+                    <label><input type="checkbox" id="enable-dual"> 启用双路（前置+后置）</label>
+                </div>
+                
+                <div class="form-group" id="local-camera-row">
+                    <label>摄像头索引</label>
+                    <input type="number" id="camera-index" min="0" max="10" value="0">
+                    <p class="info-text">通常0是默认摄像头</p>
+                </div>
+                
+                <!-- 单路URL保留兼容，但默认隐藏，由“未启用双路”时作为前置URL使用 -->
+                <div class="form-group" id="ip-camera-row" style="display:none;">
+                    <label>IP摄像头URL（单路）</label>
+                    <div class="url-input">
+                        <input type="url" id="ip-camera-url" placeholder="如：http://手机IP:端口/video 或 rtsp://...">
+                    </div>
+                    <div class="input-help">未启用双路时，此URL作为前置URL使用；启用双路后请填写下面的前置/后置URL。</div>
+                </div>
+                
+                <div class="form-group" id="ip-front-row" style="display:none;">
+                    <label>前置URL</label>
+                    <div class="url-input">
+                        <input type="url" id="ip-camera-front" placeholder="如：http://127.0.0.1:8090/cam/0">
+                    </div>
+                </div>
+                <div class="form-group" id="ip-back-row" style="display:none;">
+                    <label>后置URL</label>
+                    <div class="url-input">
+                        <input type="url" id="ip-camera-back" placeholder="如：http://127.0.0.1:8090/cam/1">
+                    </div>
+                </div>
+                <div class="form-group" id="ip-audio-row" style="display:none;">
+                    <label>音频URL</label>
+                    <div class="url-input">
+                        <input type="url" id="ip-audio-url" placeholder="如：http://127.0.0.1:8090/audio.wav">
+                    </div>
+                </div>
+                <div class="form-group" id="db-row" style="display:none;">
+                    <label>分贝阈值 (dB)</label>
+                    <input type="number" id="db-threshold" min="30" max="120" step="1" value="75">
+                    <label style="margin-top:8px; display:block;">提示保持时间（秒）</label>
+                    <input type="number" id="db-hold" min="1" max="10" step="1" value="2">
+                    <div style="margin-top:10px; display:flex; gap:10px;">
+                        <button class="btn btn-secondary" onclick="testDbAlert()">🔔 测试分贝弹窗</button>
+                        <button class="btn btn-secondary" onclick="hideDbAlert()">✖ 关闭分贝弹窗</button>
+                    </div>
+                    <p class="info-text">超过阈值时会弹出独立红色警告窗</p>
+                </div>
+            </div>
+            
+            <!-- 识别设置 -->
+            <div class="section">
+                <div class="section-title">识别设置</div>
+                
+                <div class="form-group">
+                    <label>识别阈值 <span class="range-value" id="threshold-value">0.60</span></label>
+                    <input type="range" id="threshold" min="0" max="1" step="0.05" value="0.6">
+                    <p class="info-text">值越低越容易匹配，但误报率更高</p>
+                </div>
+                
+                <div class="form-group">
+                    <label>检测间隔（秒）</label>
+                    <input type="number" id="detection-interval" min="0.1" max="5" step="0.1" value="0.5">
+                    <p class="info-text">降低此值可提高响应速度，但会增加CPU占用</p>
+                </div>
+                
+                <div class="form-group">
+                    <label>警报持续时间（秒）</label>
+                    <input type="number" id="alert-duration" min="1" max="10" step="1" value="3">
+                    <p class="info-text">无人脸后自动关闭警报的延迟时间</p>
+                </div>
+            </div>
+            
+            <!-- 目标人脸管理 -->
+            <div class="section">
+                <div class="section-title">目标人脸</div>
+                
+                <input type="file" id="face-file-input" accept="image/*" multiple>
+                <button class="btn btn-primary" onclick="addFace()">
+                    ➕ 添加人脸图片
+                </button>
+                
+                <div class="face-list" id="face-list">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="section">
+                <button class="btn btn-primary" onclick="saveSettings()">
+                    💾 保存设置
+                </button>
+                <button class="btn btn-secondary" id="start-btn" onclick="startMonitoring()">
+                    ▶️ 开始监控
+                </button>
+                <button class="btn btn-danger" id="stop-btn" onclick="stopMonitoring()" style="display: none;">
+                    ⏹️ 停止监控
+                </button>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="btn btn-secondary" id="record-start" onclick="startRecording()">⏺️ 开始录制</button>
+                    <button class="btn btn-danger" id="record-stop" onclick="stopRecording()" style="display:none;">⏹️ 停止录制</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧预览面板 -->
+        <div class="preview-panel">
+            <div class="preview-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>摄像头预览</h2>
+                        <p class="preview-status" id="preview-status">
+                            <span class="status-indicator" id="status-indicator"></span>
+                            <span id="status-text">未启动</span>
+                        </p>
+                    </div>
+                    <button class="btn-snapshot" onclick="saveSnapshot()" title="保存当前画面">
+                        📷 保存快照
+                    </button>
+                </div>
+            </div>
+            
+            <div class="preview-container">
+                <img id="preview" style="display: none;">
+                <div class="preview-placeholder" id="placeholder">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 9a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM9.5 12.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0z"/>
+                        <path d="M23 4v16a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5.586l.707-.707A1 1 0 0 1 9 2h6a1 1 0 0 1 .707.293l.707.707H22a1 1 0 0 1 1 1zM2 5v14h20V5h-5.586l-.707-.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L7.586 5H2z"/>
+                    </svg>
+                    <p>摄像头未启动</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let previewInterval = null;
+        
+        // 显示加载指示器
+        function showLoading(text = '加载中...') {
+            const overlay = document.getElementById('loading-overlay');
+            const loadingText = document.getElementById('loading-text');
+            loadingText.textContent = text;
+            overlay.classList.add('show');
+        }
+        
+        // 隐藏加载指示器
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('show');
+        }
+        
+        // 页面加载时初始化
+        window.addEventListener('pywebviewready', function() {
+            loadSettings();
+            startPreview();
+            checkMonitoringStatus();
+        });
+        
+        // 加载设置
+        async function loadSettings() {
+            try {
+                const config = await pywebview.api.get_config();
+                console.log('加载的配置:', config);
+                
+                // 摄像头类型
+                document.getElementById('camera-type').value = config.camera_type || 'local';
+                toggleCameraRows();
+                
+                // 本地与IP参数
+                document.getElementById('camera-index').value = config.camera_index ?? 0;
+                document.getElementById('ip-camera-url').value = config.ip_camera_url || '';
+                document.getElementById('enable-dual').checked = !!config.enable_dual;
+                document.getElementById('ip-camera-front').value = config.ip_camera_front_url || '';
+                document.getElementById('ip-camera-back').value = config.ip_camera_back_url || '';
+                document.getElementById('ip-audio-url').value = config.ip_audio_url || '';
+                document.getElementById('db-threshold').value = config.db_threshold ?? 75;
+                document.getElementById('db-hold').value = config.db_hold_secs ?? 2;
+                document.getElementById('threshold').value = config.recognition_threshold ?? 0.6;
+                document.getElementById('threshold-value').textContent = (config.recognition_threshold ?? 0.6).toFixed(2);
+                document.getElementById('detection-interval').value = config.detection_interval ?? 0.5;
+                document.getElementById('alert-duration').value = config.alert_duration ?? 3;
+                
+                console.log('识别阈值已设置为:', config.recognition_threshold);
+                
+                updateFaceList(config.faces || []);
+            } catch (e) {
+                console.error('加载设置失败:', e);
+            }
+        }
+        
+        // 保存设置
+        async function saveSettings() {
+            const config = {
+                camera_type: document.getElementById('camera-type').value,
+                camera_index: parseInt(document.getElementById('camera-index').value),
+                ip_camera_url: document.getElementById('ip-camera-url').value,
+                enable_dual: document.getElementById('enable-dual').checked,
+                ip_camera_front_url: document.getElementById('ip-camera-front').value,
+                ip_camera_back_url: document.getElementById('ip-camera-back').value,
+                ip_audio_url: document.getElementById('ip-audio-url').value,
+                db_threshold: parseInt(document.getElementById('db-threshold').value),
+                db_hold_secs: parseInt(document.getElementById('db-hold').value),
+                recognition_threshold: parseFloat(document.getElementById('threshold').value),
+                detection_interval: parseFloat(document.getElementById('detection-interval').value),
+                alert_duration: parseInt(document.getElementById('alert-duration').value)
+            };
+            
+            try {
+                showLoading('正在保存设置...');
+                await pywebview.api.save_config(config);
+                hideLoading();
+                showNotification('保存成功', '设置已保存', 'success');
+            } catch (e) {
+                hideLoading();
+                showNotification('保存失败', e.toString(), 'error');
+            }
+        }
+
+        // 切换显示本地/IP设置行
+        function toggleCameraRows() {
+            const type = document.getElementById('camera-type').value;
+            const localRow = document.getElementById('local-camera-row');
+            const ipRow = document.getElementById('ip-camera-row');
+            const dualRow = document.getElementById('dual-row');
+            const frontRow = document.getElementById('ip-front-row');
+            const backRow = document.getElementById('ip-back-row');
+            const audioRow = document.getElementById('ip-audio-row');
+            const dbRow = document.getElementById('db-row');
+            if (type === 'ip') {
+                localRow.style.display = 'none';
+                ipRow.style.display = 'block';
+                dualRow.style.display = 'block';
+                const dual = document.getElementById('enable-dual').checked;
+                frontRow.style.display = dual ? 'block' : 'none';
+                backRow.style.display = dual ? 'block' : 'none';
+                audioRow.style.display = 'block';
+                dbRow.style.display = 'block';
+            } else {
+                localRow.style.display = 'block';
+                ipRow.style.display = 'none';
+                dualRow.style.display = 'none';
+                frontRow.style.display = 'none';
+                backRow.style.display = 'none';
+                audioRow.style.display = 'none';
+                dbRow.style.display = 'none';
+            }
+        }
+        document.getElementById('camera-type').addEventListener('change', toggleCameraRows);
+        document.getElementById('enable-dual').addEventListener('change', toggleCameraRows);
+
+        // 分贝功能暂时注释保留
+        // async function testDbAlert(){
+        //     try {
+        //         await pywebview.api.show_db_alert();
+        //     } catch(e) { console.error(e); }
+        // }
+        // async function hideDbAlert(){
+        //     try { await pywebview.api.hide_db_alert(); } catch(e) {}
+        // }
+        
+        // 添加人脸
+        function addFace() {
+            document.getElementById('face-file-input').click();
+        }
+        
+        document.getElementById('face-file-input').addEventListener('change', async function(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            // 通过FileReader读取为DataURL并发送到后端
+            for (let file of files) {
+                try {
+                    // 询问用户输入人员名称
+                    const defaultName = file.name.replace(/\.[^/.]+$/, ''); // 去除扩展名
+                    const name = prompt(`请输入人员名称：`, defaultName);
+                    
+                    if (!name) {
+                        continue; // 用户取消
+                    }
+                    
+                    // 询问照片角度
+                    const angleOptions = `请选择照片角度：
+1 - 正面（推荐）
+2 - 左侧脸
+3 - 右侧脸
+4 - 其他角度
+
+💡 提示：为提高识别率，建议同一人添加多个角度的照片`;
+                    
+                    const angleInput = prompt(angleOptions, '1');
+                    let angle = '未指定';
+                    if (angleInput === '1') angle = '正面';
+                    else if (angleInput === '2') angle = '左侧';
+                    else if (angleInput === '3') angle = '右侧';
+                    else if (angleInput === '4') angle = '其他';
+                    
+                    showLoading(`正在添加 ${name} (${angle})...`);
+                    
+                    const dataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    
+                    await pywebview.api.add_face_base64(file.name, dataUrl, name, angle);
+                    hideLoading();
+                    showNotification('添加成功', `已添加 ${name} (${angle})`, 'success');
+                } catch (err) {
+                    hideLoading();
+                    console.error('添加人脸失败:', err);
+                    showNotification('添加失败', err.toString(), 'error');
+                }
+            }
+
+            loadSettings();
+            e.target.value = '';
+        });
+        
+        // 移除人脸
+        async function removeFace(facePath) {
+            if (confirm('确定要移除这个人脸吗？')) {
+                try {
+                    showLoading('正在删除...');
+                    await pywebview.api.remove_face(facePath);
+                    hideLoading();
+                    showNotification('删除成功', '已移除该人脸', 'success');
+                    loadSettings();
+                } catch (e) {
+                    hideLoading();
+                    console.error('移除失败:', e);
+                    showNotification('删除失败', e.toString(), 'error');
+                }
+            }
+        }
+        
+        // 更新人脸列表
+        async function updateFaceList(faces) {
+            const faceList = document.getElementById('face-list');
+            faceList.innerHTML = '';
+            
+            for (const face of faces) {
+                const faceItem = document.createElement('div');
+                faceItem.className = 'face-item';
+                
+                // 兼容旧格式（字符串）和新格式（字典）
+                let faceName, facePath, faceAngle;
+                if (typeof face === 'string') {
+                    facePath = face;
+                    faceName = face.split(/[\\/]/).pop();
+                    faceAngle = '';
+                } else if (typeof face === 'object') {
+                    facePath = face.path || '';
+                    faceName = face.name || facePath.split(/[\\/]/).pop();
+                    faceAngle = face.angle || '';
+                }
+                
+                // 创建元素
+                const img = document.createElement('img');
+                img.className = 'face-thumbnail';
+                
+                // 通过API加载图片为Base64
+                try {
+                    const base64Data = await pywebview.api.get_face_image_base64(facePath);
+                    if (base64Data) {
+                        img.src = base64Data;
+                    } else {
+                        // 如果加载失败，显示占位符
+                        img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect fill="%23333"/><text x="25" y="30" text-anchor="middle" fill="%23999" font-size="12">?</text></svg>';
+                    }
+                } catch (err) {
+                    console.error('加载图片失败:', err);
+                    img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect fill="%23333"/><text x="25" y="30" text-anchor="middle" fill="%23999" font-size="12">?</text></svg>';
+                }
+                
+                const faceInfo = document.createElement('div');
+                faceInfo.className = 'face-info';
+                let infoHTML = `<div class="face-name">${faceName}</div>`;
+                if (faceAngle && faceAngle !== '未指定') {
+                    infoHTML += `<div style="font-size: 11px; color: #666; margin-top: 2px;">${faceAngle}</div>`;
+                }
+                faceInfo.innerHTML = infoHTML;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'face-remove';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = function() {
+                    removeFace(facePath);
+                };
+                
+                faceItem.appendChild(img);
+                faceItem.appendChild(faceInfo);
+                faceItem.appendChild(removeBtn);
+                faceList.appendChild(faceItem);
+            }
+        }
+        
+        // 开始监控
+        async function startMonitoring() {
+            try {
+                showLoading('正在启动监控...');
+                await pywebview.api.start_monitoring();
+                hideLoading();
+                updateMonitoringStatus(true);
+                showNotification('监控已启动', '正在监控摄像头画面...', 'success');
+            } catch (e) {
+                hideLoading();
+                showNotification('启动失败', e.toString(), 'error');
+            }
+        }
+        
+        // 停止监控
+        async function stopMonitoring() {
+            try {
+                await pywebview.api.stop_monitoring();
+                updateMonitoringStatus(false);
+                showNotification('监控已停止', '已停止人脸识别监控', 'success');
+            } catch (e) {
+                showNotification('停止失败', e.toString(), 'error');
+            }
+        }
+        
+        // 更新监控状态显示
+        function updateMonitoringStatus(isActive) {
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const previewStatus = document.getElementById('preview-status');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            
+            if (isActive) {
+                indicator.classList.add('active');
+                statusText.textContent = '监控中';
+                previewStatus.classList.add('active');
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'flex';
+            } else {
+                indicator.classList.remove('active');
+                statusText.textContent = '未监控';
+                previewStatus.classList.remove('active');
+                startBtn.style.display = 'flex';
+                stopBtn.style.display = 'none';
+            }
+        }
+        
+        // 保存快照
+        async function saveSnapshot() {
+            try {
+                const result = await pywebview.api.save_snapshot();
+                if (result.success) {
+                    showNotification('快照已保存', '文件: ' + result.filename, 'success');
+                } else {
+                    showNotification('保存失败', result.error || '未知错误', 'error');
+                }
+            } catch (e) {
+                showNotification('保存失败', e.toString(), 'error');
+            }
+        }
+
+        // 录制控制
+        async function startRecording() {
+            try {
+                showLoading('正在开始录制...');
+                const res = await pywebview.api.start_recording();
+                hideLoading();
+                if (res.success) {
+                    document.getElementById('record-start').style.display = 'none';
+                    document.getElementById('record-stop').style.display = 'flex';
+                    showNotification('开始录制', '保存路径: ' + res.path, 'success');
+                } else {
+                    showNotification('开始录制失败', res.error || '未知错误', 'error');
+                }
+            } catch (e) {
+                hideLoading();
+                showNotification('开始录制失败', e.toString(), 'error');
+            }
+        }
+
+        async function stopRecording() {
+            try {
+                showLoading('正在停止录制...');
+                const res = await pywebview.api.stop_recording();
+                hideLoading();
+                document.getElementById('record-start').style.display = 'flex';
+                document.getElementById('record-stop').style.display = 'none';
+                if (res.success) {
+                    showNotification('录制已保存', '文件: ' + (res.path || ''), 'success');
+                } else {
+                    showNotification('停止录制失败', res.error || '未知错误', 'error');
+                }
+            } catch (e) {
+                hideLoading();
+                showNotification('停止录制失败', e.toString(), 'error');
+            }
+        }
+        
+        // 显示通知
+        function showNotification(title, message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = 'notification ' + type;
+            notification.innerHTML = `
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        // 检查监控状态
+        async function checkMonitoringStatus() {
+            try {
+                const isMonitoring = await pywebview.api.get_monitoring_status();
+                updateMonitoringStatus(isMonitoring);
+            } catch (e) {
+                console.error('获取监控状态失败:', e);
+            }
+        }
+        
+        // 开始预览
+        function startPreview() {
+            if (previewInterval) return;
+            
+            const previewImg = document.getElementById('preview');
+            const placeholder = document.getElementById('placeholder');
+            
+            previewInterval = setInterval(async function() {
+                try {
+                    const frame = await pywebview.api.get_preview_frame();
+                    if (frame) {
+                        previewImg.src = frame;
+                        previewImg.style.display = 'block';
+                        placeholder.style.display = 'none';
+                    } else {
+                        previewImg.style.display = 'none';
+                        placeholder.style.display = 'block';
+                    }
+                } catch (e) {
+                    console.error('获取预览帧失败:', e);
+                }
+            }, 100);
+        }
+        
+        // 阈值滑块更新
+        document.getElementById('threshold').addEventListener('input', function(e) {
+            document.getElementById('threshold-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+    </script>
+</body>
+</html>
+
