@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 import shutil
 import ctypes
+import logging
 
 from app.config import Config
 from app.camera import CameraMonitor
@@ -54,35 +55,72 @@ class SettingsAPI:
             mime_type = mime_map.get(ext, 'image/jpeg')
             return f"data:{mime_type};base64,{b64_data}"
         except Exception as e:
-            print(f"加载图片失败 {face_path}: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Load image failed {face_path}: {e}")
             return None
     
     def save_config(self, updates):
         """保存配置"""
         app = self._app
-        app.config.update(updates)
+        # Compute real diffs to avoid unnecessary restarts
+        old_conf = dict(app.config.data)
+        changed = {k: v for k, v in updates.items() if old_conf.get(k) != v}
+        if not changed:
+            return True
+        app.config.update(changed)
         
         # 如果摄像头索引改变，重启摄像头
-        if 'camera_index' in updates:
+        if 'camera_index' in changed:
             app.restart_camera()
         
         # 如果相机类型或URL/双路相关改变，重启摄像头
         cam_keys = {'camera_type','ip_camera_url','enable_dual','ip_camera_front_url','ip_camera_back_url'}
-        if any(k in updates for k in cam_keys):
+        if any(k in changed for k in cam_keys):
             app.restart_camera()
         
         # 音频相关参数变化，重启音频监测
         audio_keys = {'ip_audio_url','db_threshold','db_hold_secs'}
-        if any(k in updates for k in audio_keys):
+        if any(k in changed for k in audio_keys):
             app.restart_audio_monitor()
 
-        # 如果识别参数改变，重新加载人脸
-        if 'recognition_threshold' in updates or 'face_model' in updates:
+        # 检测器/识别/可视化参数变化，更新识别器
+        detector_keys = {'detector_backend','yolo_face_model_path','yunet_model_path','min_face_size','min_face_conf','ultralytics_api_key','ultralytics_model','ultralytics_api_endpoint','ultralytics_api_timeout'}
+        reload_faces_keys = {'recognition_threshold','face_model'}
+        if any(k in changed for k in detector_keys):
+            try:
+                if ('min_face_size' in changed) or ('min_face_conf' in changed):
+                    app.face_recognizer.set_detection_filters(
+                        min_size=int(app.config.get('min_face_size', 30)),
+                        min_conf=float(app.config.get('min_face_conf', 0.6))
+                    )
+            except Exception:
+                pass
+            try:
+                if {'detector_backend','yolo_face_model_path','yunet_model_path'} & set(changed.keys()):
+                    app.face_recognizer.set_detector_backend(
+                        backend=app.config.get('detector_backend', 'retinaface'),
+                        yolo_model_path=app.config.get('yolo_face_model_path', ''),
+                        yunet_model_path=app.config.get('yunet_model_path', '')
+                    )
+            except Exception:
+                pass
+            # 更新云端参数
+            try:
+                if {'detector_backend','ultralytics_api_key','ultralytics_model','ultralytics_api_endpoint','ultralytics_api_timeout'} & set(changed.keys()):
+                    app.face_recognizer.use_ultra_api = (app.config.get('detector_backend') == 'ultralytics-api')
+                    app.face_recognizer.ultra_api_key = app.config.get('ultralytics_api_key', '')
+                    app.face_recognizer.ultra_model = app.config.get('ultralytics_model', 'yolov8n-face')
+                    app.face_recognizer.ultra_api_endpoint = app.config.get('ultralytics_api_endpoint', 'https://api.ultralytics.com/v1/predict')
+                    app.face_recognizer.ultra_api_timeout = float(app.config.get('ultralytics_api_timeout', 4.0))
+            except Exception:
+                pass
+        # 仅当模型改变时才重载人脸库；阈值改变不必重载
+        if 'face_model' in changed:
             app.reload_faces()
         
         # 如果警报持续时间改变，更新警报窗口
-        if 'alert_duration' in updates:
-            app.alert_window.set_alert_duration(updates['alert_duration'])
+        if 'alert_duration' in changed:
+            app.alert_window.set_alert_duration(changed['alert_duration'])
         
         return True
     
@@ -112,13 +150,14 @@ class SettingsAPI:
             faces.append(str(destination))
             app.config.set('faces', faces)
             
-            # 重新加载人脸
-            app.reload_faces()
+            # 重新加载人脸放后台，避免阻塞
+            threading.Thread(target=app.reload_faces, daemon=True).start()
             
             return str(destination)
         
         except Exception as e:
-            print(f"添加人脸失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Add face failed: {e}")
             raise
 
     def add_face_base64(self, filename, data_url, name=None, angle_hint=None):
@@ -182,12 +221,13 @@ class SettingsAPI:
             faces.append(face_entry)
             app.config.set('faces', faces)
 
-            # 重新加载人脸
-            app.reload_faces()
+            # 重新加载人脸放后台
+            threading.Thread(target=app.reload_faces, daemon=True).start()
 
             return str(destination)
         except Exception as e:
-            print(f"添加人脸失败(Base64): {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Add face (Base64) failed: {e}")
             raise
     
     def remove_face(self, face_path):
@@ -227,7 +267,8 @@ class SettingsAPI:
             return True
         
         except Exception as e:
-            print(f"移除人脸失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Remove face failed: {e}")
             raise
     
     def start_monitoring(self):
@@ -249,9 +290,7 @@ class SettingsAPI:
     def get_preview_frame(self):
         """获取预览帧（Base64）"""
         app = self._app
-        if app.camera and app.camera.is_running():
-            return app.camera.get_frame_base64()
-        return None
+        return getattr(app, '_preview_frame_b64', None)
     
     def get_preview_frames(self):
         """获取双路预览帧"""
@@ -275,7 +314,8 @@ class SettingsAPI:
             app.db_alert.show(app.audio_monitor.get_status if app.audio_monitor else (lambda: {"db": 0.0}))
             return True
         except Exception as e:
-            print(f"显示分贝弹窗失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Show dB alert failed: {e}")
             return False
 
     def hide_db_alert(self):
@@ -293,7 +333,8 @@ class SettingsAPI:
                 app.settings_window.minimize()
                 return True
         except Exception as e:
-            print(f"最小化失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Minimize failed: {e}")
         return False
     
     def toggle_maximize(self):
@@ -347,7 +388,8 @@ class SettingsAPI:
                 app.settings_window.destroy()
                 return True
         except Exception as e:
-            print(f"关闭窗口失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Close window failed: {e}")
         return False
     
     def save_snapshot(self):
@@ -389,7 +431,8 @@ class SettingsAPI:
             out_path = app.camera.start_recording(str(file_path))
             return {"success": True, "path": out_path}
         except Exception as e:
-            print(f"开始录制失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Start recording failed: {e}")
             return {"success": False, "error": str(e)}
     
     def stop_recording(self):
@@ -401,7 +444,8 @@ class SettingsAPI:
             out_path = app.camera.stop_recording()
             return {"success": True, "path": out_path}
         except Exception as e:
-            print(f"停止录制失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Stop recording failed: {e}")
             return {"success": False, "error": str(e)}
     
     def get_monitoring_status(self):
@@ -413,6 +457,7 @@ class Application:
     """主应用程序"""
     
     def __init__(self):
+        self._setup_logging()
         self.config = Config(CONFIG_FILE)
         self.camera = None
         self.camera_back = None
@@ -428,6 +473,31 @@ class Application:
         
         # 初始化组件
         self._init_components()
+
+    def _setup_logging(self):
+        # Morandi风格控制台日志：柔和色彩+时间戳+级别
+        class MorandiFormatter(logging.Formatter):
+            COLORS = {
+                'DEBUG': '\x1b[38;5;246m',    # 灰蓝
+                'INFO': '\x1b[38;5;109m',     # 莫兰迪蓝绿
+                'WARNING': '\x1b[38;5;178m',  # 柔和琥珀
+                'ERROR': '\x1b[38;5;167m',    # 柔红
+                'CRITICAL': '\x1b[38;5;197m', # 暗洋红
+                'RESET': '\x1b[0m'
+            }
+            def format(self, record):
+                color = self.COLORS.get(record.levelname, '')
+                reset = self.COLORS['RESET']
+                ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(record.created))
+                message = super().format(record)
+                return f"{color}{ts} [{record.levelname}] {record.name}: {message}{reset}"
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        for h in list(logger.handlers):
+            logger.removeHandler(h)
+        ch = logging.StreamHandler()
+        ch.setFormatter(MorandiFormatter('%(message)s'))
+        logger.addHandler(ch)
     
     def _init_components(self):
         """初始化组件"""
@@ -444,14 +514,47 @@ class Application:
         
         # 创建人脸识别器
         model_name = self.config.get('face_model', 'Facenet512')
-        detector_backend = self.config.get('detector_backend', 'opencv')
+        detector_backend = self.config.get('detector_backend', 'retinaface')
         self.face_recognizer = FaceRecognizer(model_name, detector_backend)
+        # 是否允许Haar回退
+        try:
+            self.face_recognizer.enable_haar_fallback = bool(self.config.get('enable_haar_fallback', False))
+        except Exception:
+            pass
+        # 切换后端（支持yolov8-face）
+        try:
+            self.face_recognizer.set_detector_backend(
+                backend=self.config.get('detector_backend', 'retinaface'),
+                yolo_model_path=self.config.get('yolo_face_model_path', ''),
+                yunet_model_path=self.config.get('yunet_model_path', '')
+            )
+        except Exception:
+            pass
+        # 覆盖检测过滤参数
+        try:
+            self.face_recognizer.set_detection_filters(
+                min_size=int(self.config.get('min_face_size', 30)),
+                min_conf=float(self.config.get('min_face_conf', 0.6))
+            )
+        except Exception:
+            pass
+        # Ultralytics API 设置
+        try:
+            self.face_recognizer.use_ultra_api = (self.config.get('detector_backend') == 'ultralytics-api')
+            self.face_recognizer.ultra_api_key = self.config.get('ultralytics_api_key', '')
+            self.face_recognizer.ultra_model = self.config.get('ultralytics_model', 'yolov8n-face')
+            self.face_recognizer.ultra_api_endpoint = self.config.get('ultralytics_api_endpoint', 'https://api.ultralytics.com/v1/predict')
+            self.face_recognizer.ultra_api_timeout = float(self.config.get('ultralytics_api_timeout', 4.0))
+        except Exception:
+            pass
         
-        # 加载目标人脸
+        # 加载目标人脸放到后台，避免阻塞UI
         faces = self.config.get('faces', [])
         if faces:
-            print(f"正在加载 {len(faces)} 个目标人脸...")
-            self.face_recognizer.load_target_faces(faces)
+            def _bg_load():
+                logging.info(f"Loading {len(faces)} target faces...")
+                self.face_recognizer.load_target_faces(faces)
+            threading.Thread(target=_bg_load, daemon=True).start()
         
         # 设置警报持续时间
         alert_duration = self.config.get('alert_duration', 3)
@@ -467,7 +570,12 @@ class Application:
                 self.camera_back.start()
             except Exception as e:
                 print(f"启动第二路摄像头失败: {e}")
-
+        # Start preview encoder background thread to avoid blocking RPC
+        self._preview_running = True
+        self._preview_frame_b64 = None
+        self._preview_thread = threading.Thread(target=self._preview_encoder_loop, daemon=True)
+        self._preview_thread.start()
+        
         # 启动音频监测
         audio_url = self.config.get('ip_audio_url', '')
         if audio_url:
@@ -507,6 +615,28 @@ class Application:
             except Exception as e:
                 print(f"重启第二路摄像头失败: {e}")
 
+        # 检测器可能也被修改，重建识别器
+        try:
+            model_name = self.config.get('face_model', 'Facenet512')
+            detector_backend = self.config.get('detector_backend', 'retinaface')
+            self.face_recognizer = FaceRecognizer(model_name, detector_backend)
+            self.face_recognizer.set_detector_backend(
+                backend=detector_backend,
+                yolo_model_path=self.config.get('yolo_face_model_path', '')
+            )
+            try:
+                self.face_recognizer.enable_haar_fallback = bool(self.config.get('enable_haar_fallback', False))
+            except Exception:
+                pass
+            self.face_recognizer.set_detection_filters(
+                min_size=int(self.config.get('min_face_size', 30)),
+                min_conf=float(self.config.get('min_face_conf', 0.6))
+            )
+            # 重新加载人脸
+            self.reload_faces()
+        except Exception as e:
+            print(f"重建识别器失败: {e}")
+
     def restart_audio_monitor(self):
         """重启音频监测"""
         if self.audio_monitor:
@@ -545,7 +675,8 @@ class Application:
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
-        print("监控已启动")
+        import logging
+        logging.getLogger(__name__).info("Monitoring started")
     
     def stop_monitoring(self):
         """停止监控"""
@@ -564,8 +695,16 @@ class Application:
         detection_interval = self.config.get('detection_interval', 0.5)
         threshold = self.config.get('recognition_threshold', 0.6)
         
+        consecutive_no_match = 0
+        no_match_close_frames = 6  # ~3秒(0.5s间隔)
         while self.monitoring:
             try:
+                # 实时读取可变配置，确保保存设置后立即生效
+                try:
+                    detection_interval = float(self.config.get('detection_interval', detection_interval))
+                    threshold = float(self.config.get('recognition_threshold', threshold))
+                except Exception:
+                    pass
                 current_time = time.time()
                 
                 # 控制检测频率
@@ -574,10 +713,25 @@ class Application:
                     continue
                 
                 self.last_detection_time = current_time
+
+                # 若告警窗口当前可见，暂停人脸识别，避免摄像头拍到屏幕上的告警头像造成自我反馈
+                try:
+                    if self.alert_window and getattr(self.alert_window, 'is_showing', False):
+                        time.sleep(0.05)
+                        continue
+                except Exception:
+                    pass
                 
                 # 获取当前帧
                 frame = self.camera.get_frame()
                 if frame is None:
+                    # Treat missing frame as no-detection to avoid stale alert
+                    consecutive_no_match += 1
+                    if consecutive_no_match >= no_match_close_frames:
+                        try:
+                            self.alert_window.update({"total_faces": 0, "matched_count": 0, "matched_persons": []})
+                        except Exception:
+                            pass
                     time.sleep(0.1)
                     continue
                 
@@ -587,12 +741,16 @@ class Application:
                 # 更新警报状态
                 matched_count = result.get("matched_count", 0)
                 if matched_count > 0:
+                    consecutive_no_match = 0
                     persons = result.get("matched_persons", [])
                     names = [p.get("name") for p in persons]
-                    print(f"检测到目标人员: {', '.join(names)} (共 {matched_count} 个)")
+                    logging.getLogger(__name__).info(f"Matched: {', '.join(names)} (count {matched_count})")
                     self.alert_window.update(result)
                 else:
-                    self.alert_window.update(result)
+                    consecutive_no_match += 1
+                    # 仅在连续多帧都未匹配时再更新/尝试关闭，防止抖动
+                    if consecutive_no_match >= no_match_close_frames:
+                        self.alert_window.update(result)
 
                 # 分贝过高提示
                 if self.audio_monitor:
@@ -602,9 +760,17 @@ class Application:
                         self.db_alert.show(s.get('db', 0.0))
                     else:
                         self.db_alert.hide()
+                # 可选：在预览右侧叠加检测框（仅用于前端预览显示）
+                try:
+                    if self.config.get('show_detections', False):
+                        overlay = self.face_recognizer.draw_faces(frame)
+                        with self.camera.frame_lock:
+                            self.camera.current_frame = overlay
+                except Exception:
+                    pass
                 
             except Exception as e:
-                print(f"监控循环错误: {e}")
+                logging.getLogger(__name__).error(f"Monitor loop error: {e}")
                 time.sleep(0.5)
     
     def _wake_settings(self):
@@ -667,7 +833,8 @@ class Application:
             time.sleep(1)  # 等待窗口完全加载
             monitoring_enabled = self.config.get('monitoring_enabled', False)
             if monitoring_enabled and self.config.get('faces'):
-                print("恢复监控状态...")
+                import logging
+                logging.getLogger(__name__).info("Restore monitoring state...")
                 self.start_monitoring()
         
         # 在后台线程中恢复监控状态
@@ -677,21 +844,24 @@ class Application:
         webview.start(debug=False)
         
         # WebView关闭/隐藏后，检查是否需要继续运行
-        print("WebView窗口已关闭/隐藏")
+        import logging
+        logging.getLogger(__name__).info("WebView window closed/hidden")
         
         if self.monitoring:
-            print("监控正在运行，程序继续运行...")
-            print("提示：再次运行程序可唤醒设置窗口")
+            import logging
+            logging.getLogger(__name__).info("Monitoring is running, app keeps alive...")
+            logging.getLogger(__name__).info("Tip: run again to wake settings window")
             try:
                 while True:
                     time.sleep(1)
                     if not self.monitoring:
-                        print("监控已停止")
+                        logging.getLogger(__name__).info("Monitoring stopped")
                         break
             except KeyboardInterrupt:
                 print("收到中断信号，准备退出...")
         else:
-            print("监控未启动，程序退出...")
+            import logging
+            logging.getLogger(__name__).info("Monitoring not started, app exits...")
         
         # 清理资源
         self.cleanup(force=True)
@@ -706,7 +876,8 @@ class Application:
         has_resources = self.monitoring or self.camera or self.camera_back or self.ipc_server or self.audio_monitor
         
         if has_resources:
-            print("正在清理资源...")
+            import logging
+            logging.getLogger(__name__).info("Cleaning up resources...")
         
         # 强制清理或监控未运行时才停止
         if force or not self.monitoring:
@@ -728,5 +899,45 @@ class Application:
                 self.audio_monitor = None
         
         if has_resources:
-            print("清理完成")
+            import logging
+            logging.getLogger(__name__).info("Cleanup done")
+
+    def _preview_encoder_loop(self):
+        import base64
+        import cv2
+        last_encode_ts = 0.0
+        while getattr(self, '_preview_running', False):
+            try:
+                now = time.time()
+                # encode every 300ms
+                if now - last_encode_ts < 0.3:
+                    time.sleep(0.05)
+                    continue
+                if not (self.camera and self.camera.is_running()):
+                    time.sleep(0.1)
+                    continue
+                frame = self.camera.get_frame()
+                if frame is None:
+                    time.sleep(0.05)
+                    continue
+                overlay = frame
+                if self.config.get('show_detections', False) and self.face_recognizer:
+                    try:
+                        overlay = self.face_recognizer.draw_faces(frame)
+                        res = self.face_recognizer.recognize_faces(frame, self.config.get('recognition_threshold', 0.6))
+                        for p in res.get('matched_persons', []):
+                            box = p.get('box') or [0,0,0,0]
+                            x,y,w,h = [int(v) for v in box]
+                            name = p.get('name','')
+                            sim = float(p.get('similarity', 0.0))
+                            label = f"{name} {sim:.2f}"
+                            cv2.putText(overlay, label, (x, max(0,y-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+                    except Exception:
+                        pass
+                _, buffer = cv2.imencode('.jpg', overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+                b64 = base64.b64encode(buffer).decode('utf-8')
+                self._preview_frame_b64 = f"data:image/jpeg;base64,{b64}"
+                last_encode_ts = now
+            except Exception:
+                time.sleep(0.1)
 

@@ -29,13 +29,15 @@ class AudioMonitor:
         self.running = True
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
-        print(f"音频监测已启动: {self.audio_url}")
+        import logging
+        logging.getLogger(__name__).info(f"Audio monitor started: {self.audio_url}")
 
     def stop(self):
         self.running = False
         if self.thread:
             self.thread.join(timeout=2.0)
-        print("音频监测已停止")
+        import logging
+        logging.getLogger(__name__).info("Audio monitor stopped")
 
     def _loop(self):
         # 简单实现：拉取audio.wav流，跳过WAV头（44字节），之后读取PCM数据
@@ -68,10 +70,12 @@ class AudioMonitor:
                             if self.current_db >= self.db_threshold:
                                 self.last_high_ts = time.time()
                     except Exception as e:
-                        print(f"音频读取错误: {e}")
+                        import logging
+                        logging.getLogger(__name__).error(f"Audio read error: {e}")
                         time.sleep(0.3)
         except Exception as e:
-            print(f"音频连接失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Audio connect failed: {e}")
 
     def get_status(self):
         with self.lock:

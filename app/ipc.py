@@ -46,9 +46,11 @@ class IPCServer:
                     continue
                 except Exception as e:
                     if self.running:
-                        print(f"IPC服务器错误: {e}")
+                        import logging
+                        logging.getLogger(__name__).error(f"IPC server error: {e}")
         except Exception as e:
-            print(f"无法启动IPC服务器: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Could not start IPC server: {e}")
         finally:
             if self.sock:
                 self.sock.close()
@@ -68,9 +70,11 @@ def wake_settings_window():
         sock.connect(('127.0.0.1', IPC_PORT))
         sock.send(WAKE_COMMAND.encode('utf-8'))
         sock.close()
-        print("已发送唤醒命令")
+        import logging
+        logging.getLogger(__name__).info("Wake command sent")
     except Exception as e:
-        print(f"无法连接到运行中的实例: {e}")
+        import logging
+        logging.getLogger(__name__).error(f"Cannot connect to running instance: {e}")
 
 
 

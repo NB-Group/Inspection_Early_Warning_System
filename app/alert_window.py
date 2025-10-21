@@ -172,16 +172,32 @@ ALERT_HTML_TEMPLATE = """
                 window.pywebview.api.close_alert();
             }
         }
+        // ESC 关闭
+        document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') { closeAlert(); }
+        });
         
         window.addEventListener('pywebviewready', function() {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.get_persons().then(function(persons) {
-                    displayPersons(persons);
+                    if (typeof window.displayPersons === 'function') {
+                        window.displayPersons(persons);
+                    } else {
+                        window.__personsQueue = window.__personsQueue || [];
+                        window.__personsQueue.push(persons);
+                    }
                 });
+            }
+            // flush queued updates if any
+            if (window.__personsQueue && typeof window.displayPersons === 'function') {
+                while (window.__personsQueue.length) {
+                    window.displayPersons(window.__personsQueue.shift());
+                }
             }
         });
         
-        function displayPersons(persons) {
+        // attach to window to make it globally callable from Python
+        window.displayPersons = function(persons) {
             const container = document.getElementById('persons-container');
             const countEl = document.getElementById('count');
             
@@ -196,9 +212,16 @@ ALERT_HTML_TEMPLATE = """
                 img.className = 'person-photo';
                 // 优先使用实时裁切的人脸图像
                 if (person.face_image) {
-                    img.src = person.face_image;
+                    img.src = '';
+                    // person.face_image 里已自带 #t= 时间戳，再追加一次不同的随机数确保替换
+                    img.src = person.face_image + '&r=' + Math.random();
                 } else {
-                    img.src = 'file:///' + person.path.replace(/\\\\/g,'/');
+                    // Replace backslashes with slashes in Windows path
+                    try {
+                        img.src = 'file:///' + String(person.path).replace(/\\\\/g,'/') + '?t=' + Date.now();
+                    } catch(e) {
+                        console.error('Set image src failed', e);
+                    }
                 }
                 img.onerror = function() {
                     this.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280"><rect fill="white"/></svg>';
@@ -212,6 +235,12 @@ ALERT_HTML_TEMPLATE = """
                 card.appendChild(name);
                 container.appendChild(card);
             });
+        }
+        // if updates arrived before function definition, flush now
+        if (window.__personsQueue && window.__personsQueue.length) {
+            while (window.__personsQueue.length) {
+                window.displayPersons(window.__personsQueue.shift());
+            }
         }
     </script>
 </body>
@@ -238,14 +267,16 @@ def _alert_process_main(conn, persons_info: list, alert_duration: int):
         
         def close_alert(self):
             """用户点击关闭按钮"""
-            print("用户点击关闭按钮")
+            import logging
+            logging.getLogger(__name__).info("User clicked close button")
             should_close['value'] = True
             try:
                 # 销毁窗口
                 if self.window_container['window']:
                     self.window_container['window'].destroy()
             except Exception as e:
-                print(f"销毁窗口失败: {e}")
+                import logging
+                logging.getLogger(__name__).error(f"Destroy window failed: {e}")
             try:
                 # 通知父进程
                 self.conn.send({'cmd': 'user_close'})
@@ -274,12 +305,14 @@ def _alert_process_main(conn, persons_info: list, alert_duration: int):
         while not should_close['value']:
             # 自动关闭检查
             if time.time() - last_update_time >= alert_duration:
-                print("自动关闭警报（超时）")
+                import logging
+                logging.getLogger(__name__).info("Auto closing alert (timeout)")
                 should_close['value'] = True
                 try:
                     window.destroy()
                 except Exception as e:
-                    print(f"自动关闭失败: {e}")
+                    import logging
+                    logging.getLogger(__name__).error(f"Auto close failed: {e}")
                 sys.exit(0)
 
             if conn.poll(0.1):
@@ -292,21 +325,32 @@ def _alert_process_main(conn, persons_info: list, alert_duration: int):
                         persons_info_new = msg.get('persons', [])
                         last_update_time = time.time()
                         try:
-                            # 更新人员显示
+                            # 更新人员显示（若函数未就绪则入队，由前端脚本在就绪后flush）
                             persons_json = json.dumps(persons_info_new, ensure_ascii=False)
-                            window.evaluate_js(f"displayPersons({persons_json});")
+                            js = (
+                                f"(function(p){{"
+                                f"window.__personsQueue=window.__personsQueue||[];"
+                                f"if(typeof window.displayPersons==='function'){{window.displayPersons(p);}}"
+                                f"else{{window.__personsQueue.push(p);}}"
+                                f"}})({persons_json});"
+                            )
+                            window.evaluate_js(js)
                         except Exception as e:
-                            print(f"更新人员信息失败: {e}")
+                            import logging
+                            logging.getLogger(__name__).error(f"Update persons failed: {e}")
                     elif cmd == 'close' or cmd == 'user_close':
-                        print("收到关闭命令")
+                        import logging
+                        logging.getLogger(__name__).info("Received close command")
                         should_close['value'] = True
                         try:
                             window.destroy()
                         except Exception as e:
-                            print(f"关闭窗口失败: {e}")
+                            import logging
+                            logging.getLogger(__name__).error(f"Close window failed: {e}")
                         sys.exit(0)
                 except Exception as e:
-                    print(f"处理消息失败: {e}")
+                    import logging
+                    logging.getLogger(__name__).error(f"Process message failed: {e}")
             time.sleep(0.05)
 
     threading.Thread(target=listener, daemon=True).start()
@@ -314,9 +358,11 @@ def _alert_process_main(conn, persons_info: list, alert_duration: int):
     try:
         webview.start(debug=False)
     except Exception as e:
-        print(f"WebView启动异常: {e}")
+        import logging
+        logging.getLogger(__name__).error(f"WebView start error: {e}")
     finally:
-        print("警报窗口进程退出")
+        import logging
+        logging.getLogger(__name__).info("Alert process exit")
         sys.exit(0)
 
 
@@ -330,6 +376,7 @@ class AlertWindow:
         self.is_showing = False
         self.last_persons_hash = None  # 用于防止频繁更新
         self.user_closed = False  # 用户是否手动关闭了警报
+        self.user_closed_time = 0.0  # 记录用户关闭时间，用于冷却后重新弹出
         self.monitoring_listener_active = False  # 监听器线程是否激活
 
     def show(self, persons_info: list):
@@ -350,7 +397,8 @@ class AlertWindow:
             try:
                 self.pipe.send({'cmd': 'update', 'persons': persons_info})
             except Exception as e:
-                print(f"更新警报窗口失败: {e}")
+                import logging
+                logging.getLogger(__name__).error(f"Update alert window failed: {e}")
                 # 如果更新失败，可能进程已死，清理并重建
                 self.hide()
             else:
@@ -366,7 +414,8 @@ class AlertWindow:
             daemon=True,
         )
         self.proc.start()
-        print("警报窗口已启动")
+        import logging
+        logging.getLogger(__name__).info("Alert window started")
         
         # 启动监听线程，监听用户关闭事件
         if not self.monitoring_listener_active:
@@ -379,12 +428,22 @@ class AlertWindow:
             if self.pipe and self.pipe.poll(0.1):
                 try:
                     msg = self.pipe.recv()
-                    if isinstance(msg, dict) and msg.get('cmd') == 'user_close':
-                        print("收到用户关闭警报的消息")
-                        self.user_closed = True
-                        self.is_showing = False
+                    if isinstance(msg, dict):
+                        cmd = msg.get('cmd')
+                        import logging
+                        if cmd == 'user_close':
+                            logging.getLogger(__name__).info("User closed alert")
+                            self.user_closed = True
+                            self.user_closed_time = time.time()
+                            self.is_showing = False
+                        elif cmd == 'close':
+                            logging.getLogger(__name__).info("Alert auto-closed")
+                            # 自动关闭：不记作用户抑制
+                            self.is_showing = False
+                            self.user_closed = False
                 except Exception as e:
-                    print(f"监听关闭消息失败: {e}")
+                    import logging
+                    logging.getLogger(__name__).error(f"Listen close message failed: {e}")
             time.sleep(0.1)
         self.monitoring_listener_active = False
 
@@ -408,6 +467,7 @@ class AlertWindow:
         self.last_persons_hash = None
         if user_initiated:
             self.user_closed = True
+            self.user_closed_time = time.time()
 
     def update(self, recognition_result: dict):
         """
@@ -424,6 +484,13 @@ class AlertWindow:
         
         if matched_count > 0:
             self.last_update_time = current_time
+            # 若用户刚手动关闭，进入冷却期（默认使用 alert_duration）后才允许再次弹出
+            if self.user_closed:
+                cooldown = float(self.alert_duration)
+                if (current_time - float(self.user_closed_time or 0.0)) < cooldown:
+                    return
+                # 冷却结束，解除抑制
+                self.user_closed = False
             self.show(matched_persons)
         else:
             # 没有检测到目标人员
@@ -435,8 +502,10 @@ class AlertWindow:
             # 重要：当没有检测到目标时，重置用户关闭标志
             # 这样下次识别到目标时，警报会重新弹出（新的识别周期）
             if self.user_closed:
-                print("目标已离开，重置警报状态，下次识别会重新弹窗")
+                import logging
+                logging.getLogger(__name__).info("Target left, reset alert state; it will reappear next time")
                 self.user_closed = False
+                self.user_closed_time = 0.0
 
     def set_alert_duration(self, duration: int):
         self.alert_duration = duration

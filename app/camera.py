@@ -54,7 +54,8 @@ class CameraMonitor:
         self.thread.start()
         
         src_desc = self.stream_url if self.camera_type == 'ip' else str(self.camera_index)
-        print(f"摄像头源已启动: {src_desc}")
+        import logging
+        logging.getLogger(__name__).info(f"Camera source started: {src_desc}")
     
     def stop(self):
         """停止摄像头"""
@@ -68,7 +69,8 @@ class CameraMonitor:
                 self.camera.release()
                 self.camera = None
             
-            print("摄像头已停止")
+            import logging
+            logging.getLogger(__name__).info("Camera stopped")
         # 如果本来就没在运行，不打印任何消息
     
     def _capture_loop(self):
@@ -88,20 +90,24 @@ class CameraMonitor:
                             with self.record_lock:
                                 self.video_writer.write(frame)
                         except Exception as e:
-                            print(f"录像写入失败: {e}")
+                            import logging
+                            logging.getLogger(__name__).warning(f"Video write failed: {e}")
                     
                     # 调用所有回调函数
                     for callback in self.callbacks:
                         try:
                             callback(frame)
                         except Exception as e:
-                            print(f"回调函数执行错误: {e}")
+                            import logging
+                            logging.getLogger(__name__).warning(f"Callback error: {e}")
                 else:
-                    print("读取摄像头帧失败")
+                    import logging
+                    logging.getLogger(__name__).warning("Failed to read frame")
                     self._consecutive_failures += 1
                     # 连续失败太多，尝试重连
                     if self._consecutive_failures >= 30:
-                        print("尝试重连摄像头源...")
+                        import logging
+                        logging.getLogger(__name__).info("Reconnecting camera source...")
                         self._reopen_camera()
                         self._consecutive_failures = 0
                     time.sleep(0.1)
@@ -110,7 +116,8 @@ class CameraMonitor:
                 time.sleep(0.033)  # ~30fps
                 
             except Exception as e:
-                print(f"摄像头捕获错误: {e}")
+                import logging
+                logging.getLogger(__name__).error(f"Camera capture error: {e}")
                 time.sleep(0.1)
 
     def start_recording(self, file_path: str, fps: int = 25):
@@ -133,7 +140,8 @@ class CameraMonitor:
                 raise RuntimeError("无法打开视频文件进行写入")
             self.recording = True
             self.record_path = file_path
-            print(f"开始录制: {file_path}")
+            import logging
+            logging.getLogger(__name__).info(f"Start recording: {file_path}")
             return file_path
 
     def stop_recording(self):
@@ -146,7 +154,8 @@ class CameraMonitor:
                     pass
                 self.video_writer = None
             if self.recording:
-                print(f"结束录制: {self.record_path}")
+                import logging
+                logging.getLogger(__name__).info(f"Stop recording: {self.record_path}")
             self.recording = False
             path = self.record_path
             self.record_path = None
@@ -188,7 +197,8 @@ class CameraMonitor:
                 if not opened:
                     self.camera = cv2.VideoCapture(self.camera_index)
         except Exception as e:
-            print(f"打开摄像头失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Open camera failed: {e}")
 
     def _reopen_camera(self):
         """重连摄像头源"""
@@ -232,7 +242,8 @@ class CameraMonitor:
             return f"data:image/jpeg;base64,{jpg_as_text}"
         
         except Exception as e:
-            print(f"编码帧失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Encode frame failed: {e}")
             return None
     
     def add_callback(self, callback: Callable):
@@ -264,6 +275,7 @@ class CameraMonitor:
             cv2.imwrite(filepath, frame)
             return True
         except Exception as e:
-            print(f"保存帧失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Save frame failed: {e}")
             return False
 

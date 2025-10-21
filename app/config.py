@@ -23,9 +23,21 @@ class Config:
         "recognition_threshold": 0.6,
         "alert_duration": 3,
         "detection_interval": 0.5,
-        "face_model": "Facenet512",
-        "detector_backend": "opencv",
+        "face_model": "SFace",
+        "detector_backend": "retinaface",
+        "show_detections": False,
+        "min_face_size": 30,              # 最小人脸尺寸（像素，短边）
+        "min_face_conf": 0.6,             # 最小检测置信度（0-1）
+        "yolo_face_model_path": "",      # YOLOv8-face 模型路径（可选）
+        "yunet_model_path": "",          # YuNet 模型路径（可选）
+        # Ultralytics HUB 云端推理
+        "use_ultralytics_api": False,
+        "ultralytics_api_key": "",
+        "ultralytics_model": "yolov8n-face",
+        "ultralytics_api_endpoint": "https://api.ultralytics.com/v1/predict",
+        "ultralytics_api_timeout": 4.0,
         "monitoring_enabled": False,  # 是否启用监控（持久化）
+        "enable_haar_fallback": False, # 仅在严重异常时才回退Haar
         "faces": []  # 存储人脸信息列表 [{"name": "张三", "path": "data/faces/xxx.jpg"}, ...]
     }
     
@@ -42,7 +54,8 @@ class Config:
                     # 合并默认配置，确保新字段存在
                     return {**self.DEFAULT_CONFIG, **data}
             except Exception as e:
-                print(f"加载配置失败: {e}")
+                import logging
+                logging.getLogger(__name__).error(f"Load config failed: {e}")
                 return self.DEFAULT_CONFIG.copy()
         return self.DEFAULT_CONFIG.copy()
     
@@ -53,9 +66,11 @@ class Config:
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.data, f, indent=2, ensure_ascii=False)
-            print(f"配置已保存: {self.config_file}")
+            import logging
+            logging.getLogger(__name__).info(f"Config saved: {self.config_file}")
         except Exception as e:
-            print(f"保存配置失败: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Save config failed: {e}")
     
     def get(self, key: str, default=None):
         """获取配置项"""

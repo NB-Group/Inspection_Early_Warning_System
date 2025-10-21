@@ -5,6 +5,8 @@
 
 import sys
 import os
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')  # 抑制TF冗余日志
+os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
 import win32event
 import win32api
 import winerror
@@ -29,7 +31,9 @@ def main():
     
     if last_error == winerror.ERROR_ALREADY_EXISTS:
         # 程序已经在运行，唤醒设置窗口
-        print("程序已在运行，正在唤醒设置窗口...")
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger(__name__).info("程序已在运行，正在唤醒设置窗口...")
         from app.ipc import wake_settings_window
         wake_settings_window()
         return

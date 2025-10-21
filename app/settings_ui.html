@@ -593,9 +593,59 @@
                 <div class="section-title">识别设置</div>
                 
                 <div class="form-group">
+                    <label>检测器</label>
+                    <select id="detector-backend">
+                        <option value="retinaface">RetinaFace（推荐）</option>
+                        <option value="yolov8-face">YOLOv8-face</option>
+                        <option value="yunet">YuNet（CPU极速）</option>
+                        <option value="ultralytics-api">Ultralytics 云端（每小时100次）</option>
+                    </select>
+                    <div class="input-help">切换后会重建识别器</div>
+                </div>
+                <div class="form-group" id="yolo-row" style="display:none;">
+                    <label>YOLOv8-face 模型路径（可选）</label>
+                    <input type="text" id="yolo-face-model" placeholder="如：weights/yolov8n-face.pt">
+                    <div class="input-help">为空则使用默认内置配置</div>
+                </div>
+                <div class="form-group" id="yunet-row" style="display:none;">
+                    <label>YuNet 模型路径（可选）</label>
+                    <input type="text" id="yunet-model" placeholder="留空自动下载（需外网）">
+                    <div class="input-help">示例：data/models/face_detection_yunet_2023mar.onnx</div>
+                </div>
+                <div class="form-group" id="ultra-row" style="display:none;">
+                    <label>Ultralytics 云端设置</label>
+                    <input type="text" id="ultra-api-key" placeholder="x-api-key">
+                    <div class="input-help">每小时100次免费调用（Shared Inference）</div>
+                    <input type="text" id="ultra-model" placeholder="yolov8n-face" style="margin-top:8px;">
+                    <input type="text" id="ultra-endpoint" placeholder="https://api.ultralytics.com/v1/predict" style="margin-top:8px;">
+                </div>
+                <script>
+                    function toggleDetectorRows(){
+                        const v = document.getElementById('detector-backend').value;
+                        document.getElementById('yolo-row').style.display = (v === 'yolov8-face') ? 'block' : 'none';
+                        document.getElementById('yunet-row').style.display = (v === 'yunet') ? 'block' : 'none';
+                        document.getElementById('ultra-row').style.display = (v === 'ultralytics-api') ? 'block' : 'none';
+                    }
+                </script>
+                
+                <div class="form-group">
                     <label>识别阈值 <span class="range-value" id="threshold-value">0.60</span></label>
                     <input type="range" id="threshold" min="0" max="1" step="0.05" value="0.6">
                     <p class="info-text">值越低越容易匹配，但误报率更高</p>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="show-detections"> 在预览区叠加人脸检测框</label>
+                    <div class="input-help">仅用于可视化预览，不影响实际识别逻辑</div>
+                </div>
+                <div class="form-group">
+                    <label>最小人脸尺寸（像素）</label>
+                    <input type="number" id="min-face-size" min="10" max="400" step="2" value="30">
+                    <div class="input-help">低清场景建议保持较小，避免漏检</div>
+                </div>
+                <div class="form-group">
+                    <label>最小检测置信度（0-1）</label>
+                    <input type="number" id="min-face-conf" min="0" max="1" step="0.05" value="0.6">
+                    <div class="input-help">提高该值可减少误检；低清场景建议 0.5-0.7</div>
                 </div>
                 
                 <div class="form-group">
@@ -706,6 +756,14 @@
                 // 摄像头类型
                 document.getElementById('camera-type').value = config.camera_type || 'local';
                 toggleCameraRows();
+                // 检测器
+                document.getElementById('detector-backend').value = (config.detector_backend || 'retinaface');
+                document.getElementById('yolo-face-model').value = config.yolo_face_model_path || '';
+                document.getElementById('yunet-model').value = config.yunet_model_path || '';
+                document.getElementById('ultra-api-key').value = config.ultralytics_api_key || '';
+                document.getElementById('ultra-model').value = config.ultralytics_model || 'yolov8n-face';
+                document.getElementById('ultra-endpoint').value = config.ultralytics_api_endpoint || 'https://api.ultralytics.com/v1/predict';
+                toggleDetectorRows();
                 
                 // 本地与IP参数
                 document.getElementById('camera-index').value = config.camera_index ?? 0;
@@ -718,8 +776,11 @@
                 document.getElementById('db-hold').value = config.db_hold_secs ?? 2;
                 document.getElementById('threshold').value = config.recognition_threshold ?? 0.6;
                 document.getElementById('threshold-value').textContent = (config.recognition_threshold ?? 0.6).toFixed(2);
+                document.getElementById('show-detections').checked = !!config.show_detections;
                 document.getElementById('detection-interval').value = config.detection_interval ?? 0.5;
                 document.getElementById('alert-duration').value = config.alert_duration ?? 3;
+                document.getElementById('min-face-size').value = config.min_face_size ?? 30;
+                document.getElementById('min-face-conf').value = config.min_face_conf ?? 0.6;
                 
                 console.log('识别阈值已设置为:', config.recognition_threshold);
                 
@@ -731,10 +792,16 @@
         
         // 保存设置
         async function saveSettings() {
-            const config = {
+                const config = {
                 camera_type: document.getElementById('camera-type').value,
                 camera_index: parseInt(document.getElementById('camera-index').value),
                 ip_camera_url: document.getElementById('ip-camera-url').value,
+                    detector_backend: document.getElementById('detector-backend').value,
+                    yolo_face_model_path: document.getElementById('yolo-face-model').value,
+                    yunet_model_path: document.getElementById('yunet-model').value,
+                    ultralytics_api_key: document.getElementById('ultra-api-key').value,
+                    ultralytics_model: document.getElementById('ultra-model').value,
+                    ultralytics_api_endpoint: document.getElementById('ultra-endpoint').value,
                 enable_dual: document.getElementById('enable-dual').checked,
                 ip_camera_front_url: document.getElementById('ip-camera-front').value,
                 ip_camera_back_url: document.getElementById('ip-camera-back').value,
@@ -742,8 +809,11 @@
                 db_threshold: parseInt(document.getElementById('db-threshold').value),
                 db_hold_secs: parseInt(document.getElementById('db-hold').value),
                 recognition_threshold: parseFloat(document.getElementById('threshold').value),
+                show_detections: document.getElementById('show-detections').checked,
                 detection_interval: parseFloat(document.getElementById('detection-interval').value),
-                alert_duration: parseInt(document.getElementById('alert-duration').value)
+                alert_duration: parseInt(document.getElementById('alert-duration').value),
+                min_face_size: parseInt(document.getElementById('min-face-size').value),
+                min_face_conf: parseFloat(document.getElementById('min-face-conf').value)
             };
             
             try {
@@ -1071,6 +1141,7 @@
             const previewImg = document.getElementById('preview');
             const placeholder = document.getElementById('placeholder');
             
+            // 将预览轮询从100ms改为200ms，降低CPU
             previewInterval = setInterval(async function() {
                 try {
                     const frame = await pywebview.api.get_preview_frame();
@@ -1085,7 +1156,7 @@
                 } catch (e) {
                     console.error('获取预览帧失败:', e);
                 }
-            }, 100);
+            }, 300);
         }
         
         // 阈值滑块更新
